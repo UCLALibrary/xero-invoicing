@@ -1,0 +1,41 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-dockerfile
+{
+	"image": "xero-invoicing-xero:latest",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.black-formatter",
+				"ms-python.flake8"
+			],
+			"settings": {
+				"editor.formatOnSave": true,
+				"python.analysis.typeCheckingMode": "standard",
+				"python.editor.defaultFormatter": "ms-python.black-formatter",
+		    	"flake8.args": [
+					"--max-line-length=100",
+					"--extend-ignore=E203"
+				]
+			}
+		}
+	},
+	"workspaceMount": "source=${localWorkspaceFolder},target=/home/xero/project,type=bind",
+	"workspaceFolder": "/home/xero/project"
+
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Uncomment the next line to run commands after the container is created.
+	// "postCreateCommand": "cat /etc/os-release",
+
+	// Configure tool-specific properties.
+	// "customizations": {},
+
+	// Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "devcontainer"
+}
