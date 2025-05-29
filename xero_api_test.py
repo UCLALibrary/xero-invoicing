@@ -5,13 +5,12 @@ import webbrowser
 from oauthlib.oauth2 import WebApplicationClient
 from typing import TypeAlias
 from urllib.parse import parse_qsl, urlparse
+from pprint import pprint
 
 # from xero_python.accounting import AccountingApi
 # from xero_python.api_client import ApiClient
 # from xero_python.api_client.configuration import Configuration
 # from xero_python.api_client.oauth2 import OAuth2Token
-
-from pprint import pprint
 
 # For convenience
 config_dict: TypeAlias = dict[str, str]
@@ -174,6 +173,28 @@ def get_tenant_id(access_token: str, xero_config: config_dict) -> str:
 
 def get_invoices(access_token: str, tenant_id: str):
     get_url = "https://api.xero.com/api.xro/2.0/Invoices"
+    parameters = {"Statuses": "DRAFT,AUTHORISED"}
+    # Filtering by invoice number doesn't seem to work, contrary to the docs
+    # parameters = {"InvoiceNumber": "PRSV-INV-0017"}
+    response = requests.get(
+        get_url,
+        headers={
+            "Authorization": "Bearer " + access_token,
+            "Xero-tenant-id": tenant_id,
+            "Accept": "application/json",
+        },
+        params=parameters,
+    )
+    json_response = response.json()
+    # pprint(json_response, width=132)
+    invoices = json_response["Invoices"]
+    for invoice in invoices:
+        print(invoice["InvoiceNumber"], invoice["Status"], invoice["Total"])
+
+
+def get_invoice(access_token: str, tenant_id: str, invoice_number: str) -> dict:
+    # TODO: Merge with get_invoices, if this goes beyond POC.
+    get_url = f"https://api.xero.com/api.xro/2.0/Invoices/{invoice_number}"
     response = requests.get(
         get_url,
         headers={
@@ -182,11 +203,22 @@ def get_invoices(access_token: str, tenant_id: str):
             "Accept": "application/json",
         },
     )
-    json_response = response.json()
-    # pprint(json_response, width=132)
-    invoices = json_response["Invoices"]
-    for invoice in invoices:
-        print(invoice["InvoiceNumber"], invoice["Status"], invoice["Total"])
+    invoice = response.json()
+    return invoice
+
+
+def get_account(access_token: str, tenant_id: str, account_id: str) -> dict:
+    get_url = f"https://api.xero.com/api.xro/2.0/Accounts/{account_id}"
+    response = requests.get(
+        get_url,
+        headers={
+            "Authorization": "Bearer " + access_token,
+            "Xero-tenant-id": tenant_id,
+            "Accept": "application/json",
+        },
+    )
+    account = response.json()
+    return account
 
 
 def main() -> None:
@@ -198,6 +230,21 @@ def main() -> None:
     tenant_id = get_tenant_id(access_token, xero_config)
 
     get_invoices(access_token, tenant_id)
+
+    invoice_number = "PRSV-INV-0017"
+    invoice_data = get_invoice(access_token, tenant_id, invoice_number)
+    pprint(invoice_data, width=132)
+    # When supposedly retrieving "an invoice", the invoice data is still in a list
+    # with an "Invoices" key.
+    invoice = invoice_data["Invoices"][0]
+    line_items = invoice["LineItems"]
+    for line_item in line_items:
+        account_id = line_item["AccountID"]
+        line_item_amount = line_item["LineAmount"]
+        # Just getting one account, API returns a list, QAD for now
+        account = get_account(access_token, tenant_id, account_id)["Accounts"][0]
+        item_code = account["Name"]
+        print(item_code, line_item_amount)
 
 
 if __name__ == "__main__":
