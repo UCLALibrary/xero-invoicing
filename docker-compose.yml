@@ -1,0 +1,6 @@
+services:
+  xero:
+    build: .
+    # tty: true
+    volumes: 
+      - .:/home/xero/project

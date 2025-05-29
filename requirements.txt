@@ -1,0 +1,6 @@
+# Official Xero API SDK
+xero-python==8.1.0
+# For OAuth
+# Authlib==1.6.0
+oauthlib==3.2.2
+requests==2.32.3
