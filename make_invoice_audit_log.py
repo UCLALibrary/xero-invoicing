@@ -1,4 +1,5 @@
 import argparse
+import csv
 import datetime
 import requests
 import tomllib
@@ -250,6 +251,7 @@ def main() -> None:
     tenant_id = get_tenant_id(access_token, xero_config)
 
     invoices = get_invoices(access_token, tenant_id)
+    invoice_audit_data = []
     for invoice in invoices:
         invoice_number = invoice.get("InvoiceNumber", "NO INVOICE NUMBER")
         invoice_date = invoice.get("DateString", "NO DATE")
@@ -272,10 +274,21 @@ def main() -> None:
             elif event == "Paid":
                 user_paid = user
 
-        print(
-            f"{invoice_number=}\t{invoice_date=}\t{status=}"
-            f"\t{user_created=}\t{user_approved=}\t{user_paid=}"
+        invoice_audit_data.append(
+            {
+                "invoice_number": invoice_number,
+                "invoice_date": invoice_date,
+                "status": status,
+                "user_created": user_created,
+                "user_approved": user_approved,
+                "user_paid": user_paid,
+            }
         )
+
+    with open("invoice_audit_log.csv", "w") as f:
+        writer = csv.DictWriter(f, fieldnames=invoice_audit_data[0].keys())
+        writer.writeheader()
+        writer.writerows(invoice_audit_data)
 
 
 if __name__ == "__main__":
