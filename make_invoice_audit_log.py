@@ -27,11 +27,21 @@ def _get_config(config_file_name: str) -> dict[str, config_dict]:
 
 
 def _get_xero_config(config_file_name: str) -> config_dict:
+    """Returns the xero-specific configuration for this program.
+
+    TODO: Decide whether this is needed, or if xero constants like various
+    urls should have default values.
+    """
     config = _get_config(config_file_name)
     return config["xero"]
 
 
 def get_invoices(access_token: str, tenant_id: str) -> list[dict]:
+    """Returns all invoices associated with the given `tenant_id`.
+
+    These are filtered by hard-coded start date and status values
+    to meet the requirements for auditable invoices under our requirements.
+    """
     get_url = "https://api.xero.com/api.xro/2.0/Invoices"
     # Just "AUTHORISED" (aka "Awaiting Payment") and "PAID" statuses;
     # "SUBMITTED" (aka "Awaiting Approval") invoices are not yet approved,
@@ -82,36 +92,8 @@ def get_invoices(access_token: str, tenant_id: str) -> list[dict]:
     return invoices
 
 
-# def get_invoice(access_token: str, tenant_id: str, invoice_number: str) -> dict:
-#     # TODO: Merge with get_invoices, if this goes beyond POC.
-#     get_url = f"https://api.xero.com/api.xro/2.0/Invoices/{invoice_number}"
-#     response = requests.get(
-#         get_url,
-#         headers={
-#             "Authorization": "Bearer " + access_token,
-#             "Xero-tenant-id": tenant_id,
-#             "Accept": "application/json",
-#         },
-#     )
-#     invoice = response.json()
-#     return invoice
-
-
-# def get_account(access_token: str, tenant_id: str, account_id: str) -> dict:
-#     get_url = f"https://api.xero.com/api.xro/2.0/Accounts/{account_id}"
-#     response = requests.get(
-#         get_url,
-#         headers={
-#             "Authorization": "Bearer " + access_token,
-#             "Xero-tenant-id": tenant_id,
-#             "Accept": "application/json",
-#         },
-#     )
-#     account = response.json()
-#     return account
-
-
 def get_invoice_history(access_token: str, tenant_id: str, invoice_id: str) -> dict:
+    """Returns the history (the events Xero tracks) for the given `invoice_id`."""
     get_url = f"https://api.xero.com/api.xro/2.0/Invoices/{invoice_id}/History"
     headers = {
         "Authorization": "Bearer " + access_token,
@@ -119,8 +101,10 @@ def get_invoice_history(access_token: str, tenant_id: str, invoice_id: str) -> d
         "Accept": "application/json",
     }
     response = requests.get(url=get_url, headers=headers)
-    print(f"{invoice_id=}, {response.status_code=}")
+    # Info/debugging for invoices where xero reports an error.  These are usually
+    # HTTP 429, when we hit their API rate limits.
     if response.status_code != 200:
+        print(f"{invoice_id=}, {response.status_code=}")
         print(
             f"Current API Retry-After: {response.headers.get("Retry-After", "No retry specified")}"
         )
@@ -137,6 +121,7 @@ def main() -> None:
     invoices = get_invoices(access_token, tenant_id)
 
     invoice_audit_data = []
+    # Loop over all invoices, pulling out specific fields needed for the audit report.
     for invoice in invoices:
         invoice_number = invoice.get("InvoiceNumber", "NO INVOICE NUMBER")
         invoice_date = invoice.get("DateString", "NO DATE")
@@ -153,8 +138,8 @@ def main() -> None:
             backoff=4,
             max_delay=60,
         )
+        # Pull out specific data from the invoice's history (events).
         history_records = history.get("HistoryRecords", [])
-        # pprint(history_records, width=132)
         user_created = ""
         user_approved = ""
         user_paid = ""
@@ -184,6 +169,7 @@ def main() -> None:
             }
         )
 
+    # Dump data out to CSV, with hard-coded filename; file is replaced on each run.
     with open("invoice_audit_log.csv", "w") as f:
         writer = csv.DictWriter(f, fieldnames=invoice_audit_data[0].keys())
         writer.writeheader()

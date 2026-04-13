@@ -9,6 +9,9 @@ config_dict: TypeAlias = dict[str, str]
 
 
 def _get_auth_request_url(xero_config: config_dict) -> str:
+    """Retrieves the OAuth request URL which may be needed for
+    manual authorization of this application.
+    """
     oauth_client = WebApplicationClient(xero_config["client_id"])
     auth_request_url = oauth_client.prepare_request_uri(
         uri=xero_config["authorization_url"],
@@ -20,12 +23,18 @@ def _get_auth_request_url(xero_config: config_dict) -> str:
 
 
 def _get_auth_code(url: str) -> str:
+    """Retrieves the authorization code returned by a successful manual authorization,
+    for use in obtaining an access token.
+    """
     url_query = urlparse(url).query
     query_data = dict(parse_qsl(url_query))
     return query_data["code"]
 
 
 def _get_refresh_token(xero_config: config_dict) -> str | None:
+    """Retrieves the current refresh token from the file specified in the
+    configuration, if possible.
+    """
     try:
         with open(xero_config["refresh_token_file"], "r") as f:
             refresh_token = f.read()
@@ -35,17 +44,23 @@ def _get_refresh_token(xero_config: config_dict) -> str | None:
 
 
 def _store_refresh_token(xero_config: config_dict, refresh_token: str) -> None:
+    """Stores the current refresh token in the file specified in the
+    configuration.
+    """
     with open(xero_config["refresh_token_file"], "w") as f:
         f.write(refresh_token)
 
 
 def _get_token_from_auth_code(auth_code: str, xero_config: config_dict) -> str:
+    """Retrieves a current access token from Xero, using our local secrets and the
+    authorization code obtained by manual authorization.
+    """
+
     # requests basic auth: auth=(client_id, client_secret)
     # automatically does the same as this:
     # b64_id_secret = b64encode(bytes(client_id + ":" + client_secret, "utf-8")).decode("utf-8")
     # no need to include explicit Basic Authorization headers in request:
     # headers={"Authorization": "Basic " + b64_id_secret},
-
     response = requests.post(
         xero_config["token_url"],
         auth=(xero_config["client_id"], xero_config["client_secret"]),
@@ -61,6 +76,7 @@ def _get_token_from_auth_code(auth_code: str, xero_config: config_dict) -> str:
 
 
 def _get_token_from_refresh_token(refresh_token: str, xero_config: config_dict) -> str:
+    """Retrieves a current access token from Xero, using our current refresh token."""
     response = requests.post(
         xero_config["token_url"],
         auth=(xero_config["client_id"], xero_config["client_secret"]),
@@ -75,9 +91,12 @@ def _get_token_from_refresh_token(refresh_token: str, xero_config: config_dict) 
 
 
 def get_access_token(xero_config: config_dict) -> str:
-    # If we have a refresh token stored, use it to get a new access token.
-    # Otherwise, we have to use the web-based authorization flow to get
-    # an access code and exchange it for an access token.
+    """Retrieves a current access token from Xero, using the appropriate method.
+
+    If we have a refresh token stored, use it to get a new access token.
+    Otherwise, we have to use the web-based authorization flow to get
+    an access code and exchange it for an access token.
+    """
     refresh_token = _get_refresh_token(xero_config)
     if refresh_token:
         # use it
@@ -85,7 +104,7 @@ def get_access_token(xero_config: config_dict) -> str:
     else:
         # Use the web-based authorization flow
         auth_request_url = _get_auth_request_url(xero_config)
-        print(auth_request_url)
+        print(f"Visit this URL to authorize: {auth_request_url}")
         webbrowser.open_new(auth_request_url)
 
         auth_response_url = input("What URL did Xero return? ")
@@ -96,6 +115,7 @@ def get_access_token(xero_config: config_dict) -> str:
 
 
 def get_tenant_id(access_token: str, xero_config: config_dict) -> str:
+    """Retrieves our tenant id from Xero, based on our access token."""
     response = requests.get(
         xero_config["tenant_url"],
         headers={
