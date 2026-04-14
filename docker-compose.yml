@@ -4,3 +4,6 @@ services:
     # tty: true
     volumes: 
       - .:/home/xero/project
+    # Keep the container running until stopped via docker compose.
+    command: "sleep infinity"
+  
